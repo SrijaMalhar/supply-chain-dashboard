@@ -1,0 +1,254 @@
+/* -------- Global -------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  background-color: #f4f6fa;
+  color: #222;
+}
+
+/* -------- Header -------- */
+.app-header {
+  background-color: #1a2b4a; /* navy */
+  color: #fff;
+  padding: 20px 32px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0.3px;
+}
+
+/* -------- Layout -------- */
+.app-main {
+  max-width: 1100px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.card h2 {
+  margin-top: 0;
+  color: #1a2b4a;
+  font-size: 18px;
+  border-bottom: 2px solid #1a2b4a;
+  padding-bottom: 8px;
+}
+
+/* Table header row: title on the left, filter dropdown on the right */
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.table-header h2 {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.table-controls {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  padding-bottom: 8px;
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+}
+
+.filter-label select,
+.filter-label input {
+  padding: 6px 10px;
+  border: 1px solid #cbd2dc;
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.filter-label input:focus,
+.filter-label select:focus {
+  outline: none;
+  border-color: #1a2b4a;
+}
+
+/* -------- Pipeline summary -------- */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.summary-tile {
+  background: #f4f6fa;
+  border: 1px solid #e0e4ec;
+  border-radius: 6px;
+  padding: 14px 12px;
+  text-align: center;
+}
+
+.summary-tile.total {
+  background: #1a2b4a;
+  border-color: #1a2b4a;
+  color: #fff;
+}
+
+.summary-number {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.summary-label {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* -------- Low-stock banner -------- */
+.low-stock-banner {
+  background-color: #fff4d1;
+  border: 1px solid #FFCD11;
+  color: #5a4500;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+/* -------- Form -------- */
+.add-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.add-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: #444;
+  font-weight: 600;
+}
+
+.add-form input,
+.add-form select {
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid #cbd2dc;
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.add-form input:focus,
+.add-form select:focus {
+  outline: none;
+  border-color: #1a2b4a;
+}
+
+.form-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #1a2b4a;
+  font-weight: 600;
+}
+
+/* -------- Yellow button -------- */
+.btn-yellow {
+  background-color: #FFCD11; /* yellow */
+  color: #1a2b4a;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 4px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.15s ease;
+}
+
+.btn-yellow:hover {
+  background-color: #e6b800;
+}
+
+/* -------- Parts table -------- */
+.parts-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.parts-table th,
+.parts-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e8ef;
+  font-size: 14px;
+}
+
+.parts-table th {
+  background-color: #1a2b4a;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Inline edit-row inputs */
+.parts-table input,
+.parts-table select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #cbd2dc;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.parts-table input:focus,
+.parts-table select:focus {
+  outline: none;
+  border-color: #1a2b4a;
+}
+
+/* Stock-level row colours */
+.row-low {
+  background-color: #fde2e2; /* light red */
+}
+
+.row-ok {
+  background-color: #e3f5e1; /* light green */
+}
+
+.row-low:hover {
+  background-color: #f9cccc;
+}
+
+.row-ok:hover {
+  background-color: #cdebc8;
+}
