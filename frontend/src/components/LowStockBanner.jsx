@@ -1,31 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { API_BASE } from '../api.js';
 
-/**
- * LowStockBanner
- *
- * Pings GET /api/parts/low-stock and shows a warning banner
- * when at least one part is low on stock.
- *
- * Props:
- *   - refreshKey: re-fetches whenever this changes
- */
-export default function LowStockBanner({ refreshKey }) {
+export default function LowStockBanner({ tick }) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
     fetch(`${API_BASE}/low-stock`)
-      .then((res) => res.json())
-      .then((data) => setCount(data.length))
-      .catch((err) => console.error('Failed to load low-stock parts:', err));
-  }, [refreshKey]);
+      .then(r => r.json())
+      .then(d => setCount(d.length))
+      .catch(() => {});
+  }, [tick]);
 
-  // Hide the banner entirely when nothing is low.
-  if (count <= 0) return null;
+  if (!count) return null;
 
   return (
     <div className="low-stock-banner">
-      ⚠️ {count} part{count === 1 ? '' : 's'} {count === 1 ? 'is' : 'are'} low on stock
+      ⚠️ {count} part{count > 1 ? 's are' : ' is'} low on stock
     </div>
   );
 }
