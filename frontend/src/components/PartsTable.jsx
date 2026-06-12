@@ -3,24 +3,49 @@ import { API_BASE } from '../api.js';
 
 const STAGES = ['SUPPLIER', 'WAREHOUSE', 'ASSEMBLY', 'DEPLOYED'];
 
+const EVENT_ICON = { created: '🟢', stock_updated: '📦', stage_changed: '➡️' };
+
 function exportCSV(rows) {
   const header = 'Part Name,Supplier,Machine Model,Stage,Stock';
   const lines = rows.map(p => [p.partName, p.supplierName, p.machineModel, p.stage, p.stockQuantity].join(','));
-  const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' });
-  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'parts.csv' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })),
+    download: 'parts.csv',
+  });
   a.click();
 }
 
+function HistoryPanel({ partId }) {
+  const [entries, setEntries] = useState(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/${partId}/history`).then(r => r.json()).then(setEntries).catch(() => setEntries([]));
+  }, [partId]);
+  if (!entries) return <p style={{ margin: '8px 0', color: '#666' }}>Loading history…</p>;
+  if (!entries.length) return <p style={{ margin: '8px 0', color: '#666' }}>No history yet.</p>;
+  return (
+    <ul style={{ margin: '6px 0', padding: 0, listStyle: 'none', fontSize: '0.85rem' }}>
+      {entries.map(e => (
+        <li key={e.id} style={{ padding: '4px 0', borderBottom: '1px solid #eee', display: 'flex', gap: 10 }}>
+          <span>{EVENT_ICON[e.event] ?? '•'}</span>
+          <span style={{ color: '#888', whiteSpace: 'nowrap' }}>{new Date(e.timestamp).toLocaleString()}</span>
+          <span>{e.note}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function PartsTable({ tick, onChange }) {
-  const [parts, setParts]       = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [search, setSearch]     = useState('');
-  const [stage, setStage]       = useState('ALL');
-  const [model, setModel]       = useState('ALL');
-  const [sortKey, setSortKey]   = useState('partName');
-  const [sortAsc, setSortAsc]   = useState(true);
-  const [editId, setEditId]     = useState(null);
-  const [editForm, setEditForm] = useState(null);
+  const [parts, setParts]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState('');
+  const [stage, setStage]         = useState('ALL');
+  const [model, setModel]         = useState('ALL');
+  const [sortKey, setSortKey]     = useState('partName');
+  const [sortAsc, setSortAsc]     = useState(true);
+  const [editId, setEditId]       = useState(null);
+  const [editForm, setEditForm]   = useState(null);
+  const [historyId, setHistoryId] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -47,16 +72,19 @@ export default function PartsTable({ tick, onChange }) {
 
   const del = id => {
     if (!confirm('Delete this part?')) return;
-    fetch(`${API_BASE}/${id}`, { method: 'DELETE' }).then(onChange).catch(() => {});
+    fetch(`${API_BASE}/${id}`, { method: 'DELETE' }).then(onChange);
   };
 
   const advance = id => {
-    fetch(`${API_BASE}/${id}/advance`, { method: 'PUT' }).then(onChange).catch(() => {});
+    fetch(`${API_BASE}/${id}/advance`, { method: 'PUT' }).then(onChange);
   };
 
   const save = () => {
-    fetch(`${API_BASE}/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editForm) })
-      .then(() => { setEditId(null); onChange(); }).catch(() => {});
+    fetch(`${API_BASE}/${editId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm),
+    }).then(() => { setEditId(null); onChange(); });
   };
 
   const icon = key => sortKey === key ? (sortAsc ? ' ▲' : ' ▼') : ' ⇅';
@@ -89,14 +117,19 @@ export default function PartsTable({ tick, onChange }) {
             {[['partName','Part Name'],['supplierName','Supplier'],['machineModel','Machine Model'],['stage','Stage'],['stockQuantity','Stock']].map(([k,l]) => (
               <th key={k} onClick={() => sort(k)}>{l}<span className="sort-icon">{icon(k)}</span></th>
             ))}
-            <th>Advance</th><th>Edit</th><th>Delete</th>
+            <th>Advance</th><th>Edit</th><th>History</th><th>Delete</th>
           </tr>
         </thead>
         <tbody>
           {visible.map(p => {
             const row = p.stockQuantity < 10 ? 'row-low' : 'row-ok';
+            const open = historyId === p.id;
+
             if (editId === p.id && editForm) {
-              const upd = e => { const {name,value} = e.target; setEditForm(f => ({...f,[name]: name==='stockQuantity'?Number(value):value})); };
+              const upd = e => {
+                const { name, value } = e.target;
+                setEditForm(f => ({ ...f, [name]: name === 'stockQuantity' ? Number(value) : value }));
+              };
               return (
                 <tr key={p.id} className={row}>
                   <td><input name="partName" value={editForm.partName} onChange={upd}/></td>
@@ -106,20 +139,34 @@ export default function PartsTable({ tick, onChange }) {
                   <td><input type="number" name="stockQuantity" min="0" value={editForm.stockQuantity} onChange={upd}/></td>
                   <td>—</td>
                   <td><button className="btn-yellow" onClick={save}>Save</button></td>
+                  <td>—</td>
                   <td><button className="btn-yellow" onClick={() => setEditId(null)}>Cancel</button></td>
                 </tr>
               );
             }
+
             return (
-              <tr key={p.id} className={row}>
-                <td>{p.partName}</td><td>{p.supplierName}</td><td>{p.machineModel}</td><td>{p.stage}</td><td>{p.stockQuantity}</td>
-                <td><button className="btn-yellow" onClick={() => advance(p.id)} disabled={p.stage==='DEPLOYED'}>{p.stage==='DEPLOYED'?'Done':'Advance →'}</button></td>
-                <td><button className="btn-yellow" onClick={() => { setEditId(p.id); setEditForm({...p}); }}>Edit</button></td>
-                <td><button className="btn-danger" onClick={() => del(p.id)}>Delete</button></td>
-              </tr>
+              <>
+                <tr key={p.id} className={row}>
+                  <td>{p.partName}</td><td>{p.supplierName}</td><td>{p.machineModel}</td>
+                  <td>{p.stage}</td><td>{p.stockQuantity}</td>
+                  <td><button className="btn-yellow" onClick={() => advance(p.id)} disabled={p.stage==='DEPLOYED'}>{p.stage==='DEPLOYED'?'Done':'Advance →'}</button></td>
+                  <td><button className="btn-yellow" onClick={() => { setEditId(p.id); setEditForm({...p}); }}>Edit</button></td>
+                  <td><button className="btn-ghost" onClick={() => setHistoryId(open ? null : p.id)}>{open ? 'Hide' : 'History'}</button></td>
+                  <td><button className="btn-danger" onClick={() => del(p.id)}>Delete</button></td>
+                </tr>
+                {open && (
+                  <tr key={`hist-${p.id}`}>
+                    <td colSpan="9" style={{ padding: '8px 16px', background: '#f8f9fb' }}>
+                      <strong style={{ fontSize: '0.85rem', color: '#555' }}>Change log — {p.partName}</strong>
+                      <HistoryPanel partId={p.id} />
+                    </td>
+                  </tr>
+                )}
+              </>
             );
           })}
-          {!visible.length && <tr><td colSpan="8" style={{textAlign:'center'}}>{!parts.length ? 'No parts yet.' : 'No matches.'}</td></tr>}
+          {!visible.length && <tr><td colSpan="9" style={{textAlign:'center'}}>{!parts.length ? 'No parts yet.' : 'No matches.'}</td></tr>}
         </tbody>
       </table>
     </section>

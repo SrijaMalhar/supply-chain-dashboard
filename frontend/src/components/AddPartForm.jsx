@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { API_BASE } from '../api.js';
 
 const STAGES = ['SUPPLIER', 'WAREHOUSE', 'ASSEMBLY', 'DEPLOYED'];
-const BLANK = { partName: '', supplierName: '', machineModel: '', stage: 'SUPPLIER', stockQuantity: 0 };
+const BLANK = { partName: '', supplierName: '', machineModel: '', stage: 'SUPPLIER', stockQuantity: 0, unitCost: 0 };
 
 export default function AddPartForm({ onAdded }) {
   const [form, setForm] = useState(BLANK);
@@ -10,7 +10,8 @@ export default function AddPartForm({ onAdded }) {
 
   const set = e => {
     const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: name === 'stockQuantity' ? Number(value) : value }));
+    const nums = ['stockQuantity', 'unitCost'];
+    setForm(f => ({ ...f, [name]: nums.includes(name) ? Number(value) : value }));
   };
 
   const submit = e => {
@@ -34,6 +35,7 @@ export default function AddPartForm({ onAdded }) {
           </select>
         </label>
         <label>Stock Qty<input type="number" name="stockQuantity" min="0" value={form.stockQuantity} onChange={set} required /></label>
+        <label>Unit Cost ($)<input type="number" name="unitCost" min="0" step="0.01" value={form.unitCost} onChange={set} required /></label>
         <button type="submit" className="btn-yellow">Add Part</button>
         {msg && <p className="form-message">{msg}</p>}
       </form>

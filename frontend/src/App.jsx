@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import LowStockBanner from './components/LowStockBanner.jsx';
 import StageSummary from './components/StageSummary.jsx';
+import ValueSummary from './components/ValueSummary.jsx';
 import AddPartForm from './components/AddPartForm.jsx';
 import PartsTable from './components/PartsTable.jsx';
 
@@ -16,6 +17,7 @@ export default function App() {
       <main className="app-main">
         <LowStockBanner tick={tick} />
         <StageSummary tick={tick} />
+        <ValueSummary tick={tick} />
         <AddPartForm onAdded={refresh} />
         <PartsTable tick={tick} onChange={refresh} />
       </main>
