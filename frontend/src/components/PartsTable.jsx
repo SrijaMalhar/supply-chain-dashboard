@@ -1,275 +1,125 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { API_BASE } from '../api.js';
 
-// "ALL" means no filter; the rest match the backend's stage values.
-const STAGE_FILTERS = ['ALL', 'SUPPLIER', 'WAREHOUSE', 'ASSEMBLY', 'DEPLOYED'];
-// Stages used by the inline edit dropdown (no "ALL" here).
 const STAGES = ['SUPPLIER', 'WAREHOUSE', 'ASSEMBLY', 'DEPLOYED'];
 
-/**
- * PartsTable
- *
- * Fetches all parts from GET /api/parts and renders them in a table.
- * Rows are coloured red when stock is low (< 10) and green otherwise.
- * Each row has a Delete button that calls DELETE /api/parts/{id}.
- *
- * Props:
- *   - refreshKey: changes whenever the parent wants us to re-fetch
- *   - onPartDeleted: callback fired after a successful delete
- *   - onPartChanged: callback fired after advancing a part's stage
- */
-export default function PartsTable({ refreshKey, onPartDeleted, onPartChanged }) {
-  const [parts, setParts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stageFilter, setStageFilter] = useState('ALL');
-  const [search, setSearch] = useState('');
-  // Id of the row currently being edited (null = nothing being edited).
-  const [editingId, setEditingId] = useState(null);
-  // Working copy of the row's fields while editing.
+function exportCSV(rows) {
+  const header = 'Part Name,Supplier,Machine Model,Stage,Stock';
+  const lines = rows.map(p => [p.partName, p.supplierName, p.machineModel, p.stage, p.stockQuantity].join(','));
+  const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'parts.csv' });
+  a.click();
+}
+
+export default function PartsTable({ tick, onChange }) {
+  const [parts, setParts]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState('');
+  const [stage, setStage]       = useState('ALL');
+  const [model, setModel]       = useState('ALL');
+  const [sortKey, setSortKey]   = useState('partName');
+  const [sortAsc, setSortAsc]   = useState(true);
+  const [editId, setEditId]     = useState(null);
   const [editForm, setEditForm] = useState(null);
 
-  // Apply both the stage dropdown and the search box to the fetched list.
-  // useMemo avoids re-filtering on every render.
-  const visibleParts = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return parts.filter((p) => {
-      const matchesStage = stageFilter === 'ALL' || p.stage === stageFilter;
-      const matchesSearch =
-        term === '' ||
-        p.partName.toLowerCase().includes(term) ||
-        p.supplierName.toLowerCase().includes(term);
-      return matchesStage && matchesSearch;
-    });
-  }, [parts, stageFilter, search]);
-
-  // Re-fetch every time refreshKey changes (e.g., after add/delete).
   useEffect(() => {
     setLoading(true);
-    fetch(API_BASE)
-      .then((res) => res.json())
-      .then((data) => {
-        setParts(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Failed to load parts:', err);
-        setLoading(false);
+    fetch(API_BASE).then(r => r.json()).then(d => { setParts(d); setLoading(false); }).catch(() => setLoading(false));
+  }, [tick]);
+
+  const models = useMemo(() => ['ALL', ...[...new Set(parts.map(p => p.machineModel))].sort()], [parts]);
+
+  const sort = key => key === sortKey ? setSortAsc(a => !a) : (setSortKey(key), setSortAsc(true));
+
+  const visible = useMemo(() => {
+    const q = search.toLowerCase();
+    return [...parts]
+      .filter(p =>
+        (stage === 'ALL' || p.stage === stage) &&
+        (model === 'ALL' || p.machineModel === model) &&
+        (!q || p.partName.toLowerCase().includes(q) || p.supplierName.toLowerCase().includes(q))
+      )
+      .sort((a, b) => {
+        const [av, bv] = [a[sortKey], b[sortKey]];
+        return (sortAsc ? 1 : -1) * (typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv)));
       });
-  }, [refreshKey]);
+  }, [parts, stage, model, search, sortKey, sortAsc]);
 
-  const handleDelete = (id) => {
-    fetch(`${API_BASE}/${id}`, { method: 'DELETE' })
-      .then(() => {
-        if (onPartDeleted) onPartDeleted();
-      })
-      .catch((err) => console.error('Failed to delete part:', err));
+  const del = id => {
+    if (!confirm('Delete this part?')) return;
+    fetch(`${API_BASE}/${id}`, { method: 'DELETE' }).then(onChange).catch(() => {});
   };
 
-  // Calls PUT /api/parts/{id}/advance to move the part to the next stage.
-  const handleAdvance = (id) => {
-    fetch(`${API_BASE}/${id}/advance`, { method: 'PUT' })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to advance part');
-        if (onPartChanged) onPartChanged();
-      })
-      .catch((err) => console.error(err));
+  const advance = id => {
+    fetch(`${API_BASE}/${id}/advance`, { method: 'PUT' }).then(onChange).catch(() => {});
   };
 
-  // Begin editing a row -- copy its current fields into editForm.
-  const startEdit = (part) => {
-    setEditingId(part.id);
-    setEditForm({ ...part });
+  const save = () => {
+    fetch(`${API_BASE}/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editForm) })
+      .then(() => { setEditId(null); onChange(); }).catch(() => {});
   };
 
-  // Cancel without saving.
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm(null);
-  };
+  const icon = key => sortKey === key ? (sortAsc ? ' ▲' : ' ▼') : ' ⇅';
 
-  // Update one field of the in-progress edit form.
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditForm((prev) => ({
-      ...prev,
-      [name]: name === 'stockQuantity' ? Number(value) : value,
-    }));
-  };
-
-  // Persist the edit via PUT /api/parts/{id}.
-  const saveEdit = () => {
-    fetch(`${API_BASE}/${editingId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editForm),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to update part');
-        cancelEdit();
-        if (onPartChanged) onPartChanged();
-      })
-      .catch((err) => console.error(err));
-  };
-
-  if (loading) return <p>Loading parts...</p>;
+  if (loading) return <p>Loading...</p>;
 
   return (
     <section className="card">
       <div className="table-header">
         <h2>All Parts</h2>
         <div className="table-controls">
-          <label className="filter-label">
-            Search:
-            <input
-              type="text"
-              value={search}
-              placeholder="Part or supplier..."
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </label>
-          <label className="filter-label">
-            Stage:
-            <select
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-            >
-              {STAGE_FILTERS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+          <label className="filter-label">Search: <input value={search} placeholder="Part or supplier..." onChange={e => setSearch(e.target.value)} /></label>
+          <label className="filter-label">Stage:
+            <select value={stage} onChange={e => setStage(e.target.value)}>
+              {['ALL', ...STAGES].map(s => <option key={s}>{s}</option>)}
             </select>
           </label>
+          <label className="filter-label">Machine:
+            <select value={model} onChange={e => setModel(e.target.value)}>
+              {models.map(m => <option key={m}>{m}</option>)}
+            </select>
+          </label>
+          <button className="btn-yellow" onClick={() => exportCSV(visible)}>Export CSV</button>
         </div>
       </div>
+
       <table className="parts-table">
         <thead>
           <tr>
-            <th>Part Name</th>
-            <th>Supplier</th>
-            <th>Machine Model</th>
-            <th>Stage</th>
-            <th>Stock</th>
-            <th>Advance</th>
-            <th>Edit</th>
-            <th>Delete</th>
+            {[['partName','Part Name'],['supplierName','Supplier'],['machineModel','Machine Model'],['stage','Stage'],['stockQuantity','Stock']].map(([k,l]) => (
+              <th key={k} onClick={() => sort(k)}>{l}<span className="sort-icon">{icon(k)}</span></th>
+            ))}
+            <th>Advance</th><th>Edit</th><th>Delete</th>
           </tr>
         </thead>
         <tbody>
-          {visibleParts.map((p) => {
-            // Tag the row based on stock level so CSS can colour it.
-            const rowClass = p.stockQuantity < 10 ? 'row-low' : 'row-ok';
-            // DEPLOYED is the final stage -- no further advance possible.
-            const isFinalStage = p.stage === 'DEPLOYED';
-            const isEditing = editingId === p.id;
-
-            // ---- Edit-mode row ----
-            if (isEditing && editForm) {
+          {visible.map(p => {
+            const row = p.stockQuantity < 10 ? 'row-low' : 'row-ok';
+            if (editId === p.id && editForm) {
+              const upd = e => { const {name,value} = e.target; setEditForm(f => ({...f,[name]: name==='stockQuantity'?Number(value):value})); };
               return (
-                <tr key={p.id} className={rowClass}>
-                  <td>
-                    <input
-                      name="partName"
-                      value={editForm.partName}
-                      onChange={handleEditChange}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      name="supplierName"
-                      value={editForm.supplierName}
-                      onChange={handleEditChange}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      name="machineModel"
-                      value={editForm.machineModel}
-                      onChange={handleEditChange}
-                    />
-                  </td>
-                  <td>
-                    <select
-                      name="stage"
-                      value={editForm.stage}
-                      onChange={handleEditChange}
-                    >
-                      {STAGES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      name="stockQuantity"
-                      min="0"
-                      value={editForm.stockQuantity}
-                      onChange={handleEditChange}
-                    />
-                  </td>
-                  {/* "Advance" column is disabled during edit */}
+                <tr key={p.id} className={row}>
+                  <td><input name="partName" value={editForm.partName} onChange={upd}/></td>
+                  <td><input name="supplierName" value={editForm.supplierName} onChange={upd}/></td>
+                  <td><input name="machineModel" value={editForm.machineModel} onChange={upd}/></td>
+                  <td><select name="stage" value={editForm.stage} onChange={upd}>{STAGES.map(s=><option key={s}>{s}</option>)}</select></td>
+                  <td><input type="number" name="stockQuantity" min="0" value={editForm.stockQuantity} onChange={upd}/></td>
                   <td>—</td>
-                  <td>
-                    <button className="btn-yellow" onClick={saveEdit}>
-                      Save
-                    </button>
-                  </td>
-                  <td>
-                    <button className="btn-yellow" onClick={cancelEdit}>
-                      Cancel
-                    </button>
-                  </td>
+                  <td><button className="btn-yellow" onClick={save}>Save</button></td>
+                  <td><button className="btn-yellow" onClick={() => setEditId(null)}>Cancel</button></td>
                 </tr>
               );
             }
-
-            // ---- Display-mode row ----
             return (
-              <tr key={p.id} className={rowClass}>
-                <td>{p.partName}</td>
-                <td>{p.supplierName}</td>
-                <td>{p.machineModel}</td>
-                <td>{p.stage}</td>
-                <td>{p.stockQuantity}</td>
-                <td>
-                  <button
-                    className="btn-yellow"
-                    onClick={() => handleAdvance(p.id)}
-                    disabled={isFinalStage}
-                    title={isFinalStage ? 'Already deployed' : 'Move to next stage'}
-                  >
-                    {isFinalStage ? 'Done' : 'Advance →'}
-                  </button>
-                </td>
-                <td>
-                  <button
-                    className="btn-yellow"
-                    onClick={() => startEdit(p)}
-                  >
-                    Edit
-                  </button>
-                </td>
-                <td>
-                  <button
-                    className="btn-yellow"
-                    onClick={() => handleDelete(p.id)}
-                  >
-                    Delete
-                  </button>
-                </td>
+              <tr key={p.id} className={row}>
+                <td>{p.partName}</td><td>{p.supplierName}</td><td>{p.machineModel}</td><td>{p.stage}</td><td>{p.stockQuantity}</td>
+                <td><button className="btn-yellow" onClick={() => advance(p.id)} disabled={p.stage==='DEPLOYED'}>{p.stage==='DEPLOYED'?'Done':'Advance →'}</button></td>
+                <td><button className="btn-yellow" onClick={() => { setEditId(p.id); setEditForm({...p}); }}>Edit</button></td>
+                <td><button className="btn-danger" onClick={() => del(p.id)}>Delete</button></td>
               </tr>
             );
           })}
-          {visibleParts.length === 0 && (
-            <tr>
-              <td colSpan="8" style={{ textAlign: 'center' }}>
-                {parts.length === 0
-                  ? 'No parts yet. Add one above!'
-                  : 'No parts match the current filters.'}
-              </td>
-            </tr>
-          )}
+          {!visible.length && <tr><td colSpan="8" style={{textAlign:'center'}}>{!parts.length ? 'No parts yet.' : 'No matches.'}</td></tr>}
         </tbody>
       </table>
     </section>
