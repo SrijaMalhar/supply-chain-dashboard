@@ -3,6 +3,7 @@ import LowStockBanner from './components/LowStockBanner.jsx';
 import StageSummary from './components/StageSummary.jsx';
 import ValueSummary from './components/ValueSummary.jsx';
 import SupplierPerformance from './components/SupplierPerformance.jsx';
+import StatusReport from './components/StatusReport.jsx';
 import AddPartForm from './components/AddPartForm.jsx';
 import PartsTable from './components/PartsTable.jsx';
 
@@ -14,6 +15,7 @@ export default function App() {
     <div>
       <header className="app-header">
         <h1>Supply Chain Parts Traceability</h1>
+        <StatusReport tick={tick} />
       </header>
       <main className="app-main">
         <LowStockBanner tick={tick} />

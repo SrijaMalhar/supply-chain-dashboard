@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { API_BASE } from '../api.js';
 
 const STAGES = ['SUPPLIER', 'WAREHOUSE', 'ASSEMBLY', 'DEPLOYED'];
-const BLANK = { partName: '', supplierName: '', machineModel: '', stage: 'SUPPLIER', stockQuantity: 0, unitCost: 0, reorderThreshold: 10 };
+const BLANK = { partName: '', supplierName: '', machineModel: '', stage: 'SUPPLIER', stockQuantity: 0, unitCost: 0, reorderThreshold: 10, notes: '' };
 
 export default function AddPartForm({ onAdded }) {
   const [form, setForm] = useState(BLANK);
@@ -19,7 +19,7 @@ export default function AddPartForm({ onAdded }) {
     fetch(API_BASE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(() => { setMsg('✅ Part added!'); setForm(BLANK); onAdded(); setTimeout(() => setMsg(''), 2500); })
-      .catch(() => setMsg('❌ Failed to add part.'));
+      .catch(() => setMsg('❌ Failed.'));
   };
 
   return (
@@ -29,14 +29,11 @@ export default function AddPartForm({ onAdded }) {
         <label>Part Name<input name="partName" value={form.partName} onChange={set} required /></label>
         <label>Supplier<input name="supplierName" value={form.supplierName} onChange={set} required /></label>
         <label>Machine Model<input name="machineModel" value={form.machineModel} onChange={set} required /></label>
-        <label>Stage
-          <select name="stage" value={form.stage} onChange={set}>
-            {STAGES.map(s => <option key={s}>{s}</option>)}
-          </select>
-        </label>
+        <label>Stage<select name="stage" value={form.stage} onChange={set}>{STAGES.map(s => <option key={s}>{s}</option>)}</select></label>
         <label>Stock Qty<input type="number" name="stockQuantity" min="0" value={form.stockQuantity} onChange={set} required /></label>
         <label>Unit Cost ($)<input type="number" name="unitCost" min="0" step="0.01" value={form.unitCost} onChange={set} required /></label>
         <label>Reorder At<input type="number" name="reorderThreshold" min="0" value={form.reorderThreshold} onChange={set} required /></label>
+        <label className="notes-field">Notes<textarea name="notes" value={form.notes} onChange={set} placeholder="Optional — e.g. waiting on supplier quote" rows={2} /></label>
         <button type="submit" className="btn-yellow">Add Part</button>
         {msg && <p className="form-message">{msg}</p>}
       </form>
