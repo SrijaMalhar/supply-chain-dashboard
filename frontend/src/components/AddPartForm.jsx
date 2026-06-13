@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { API_BASE } from '../api.js';
 
 const STAGES = ['SUPPLIER', 'WAREHOUSE', 'ASSEMBLY', 'DEPLOYED'];
-const BLANK = { partName: '', supplierName: '', machineModel: '', stage: 'SUPPLIER', stockQuantity: 0, unitCost: 0 };
+const BLANK = { partName: '', supplierName: '', machineModel: '', stage: 'SUPPLIER', stockQuantity: 0, unitCost: 0, reorderThreshold: 10 };
 
 export default function AddPartForm({ onAdded }) {
   const [form, setForm] = useState(BLANK);
@@ -10,7 +10,7 @@ export default function AddPartForm({ onAdded }) {
 
   const set = e => {
     const { name, value } = e.target;
-    const nums = ['stockQuantity', 'unitCost'];
+    const nums = ['stockQuantity', 'unitCost', 'reorderThreshold'];
     setForm(f => ({ ...f, [name]: nums.includes(name) ? Number(value) : value }));
   };
 
@@ -36,6 +36,7 @@ export default function AddPartForm({ onAdded }) {
         </label>
         <label>Stock Qty<input type="number" name="stockQuantity" min="0" value={form.stockQuantity} onChange={set} required /></label>
         <label>Unit Cost ($)<input type="number" name="unitCost" min="0" step="0.01" value={form.unitCost} onChange={set} required /></label>
+        <label>Reorder At<input type="number" name="reorderThreshold" min="0" value={form.reorderThreshold} onChange={set} required /></label>
         <button type="submit" className="btn-yellow">Add Part</button>
         {msg && <p className="form-message">{msg}</p>}
       </form>

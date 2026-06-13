@@ -2,12 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { API_BASE } from '../api.js';
 
 const STAGES = ['SUPPLIER', 'WAREHOUSE', 'ASSEMBLY', 'DEPLOYED'];
-
 const EVENT_ICON = { created: '🟢', stock_updated: '📦', stage_changed: '➡️' };
 
 function exportCSV(rows) {
-  const header = 'Part Name,Supplier,Machine Model,Stage,Stock';
-  const lines = rows.map(p => [p.partName, p.supplierName, p.machineModel, p.stage, p.stockQuantity].join(','));
+  const header = 'Part Name,Supplier,Machine Model,Stage,Stock,Unit Cost,Reorder At';
+  const lines = rows.map(p => [p.partName, p.supplierName, p.machineModel, p.stage, p.stockQuantity, p.unitCost, p.reorderThreshold].join(','));
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })),
     download: 'parts.csv',
@@ -53,7 +52,6 @@ export default function PartsTable({ tick, onChange }) {
   }, [tick]);
 
   const models = useMemo(() => ['ALL', ...[...new Set(parts.map(p => p.machineModel))].sort()], [parts]);
-
   const sort = key => key === sortKey ? setSortAsc(a => !a) : (setSortKey(key), setSortAsc(true));
 
   const visible = useMemo(() => {
@@ -74,22 +72,17 @@ export default function PartsTable({ tick, onChange }) {
     if (!confirm('Delete this part?')) return;
     fetch(`${API_BASE}/${id}`, { method: 'DELETE' }).then(onChange);
   };
-
-  const advance = id => {
-    fetch(`${API_BASE}/${id}/advance`, { method: 'PUT' }).then(onChange);
-  };
-
+  const advance = id => fetch(`${API_BASE}/${id}/advance`, { method: 'PUT' }).then(onChange);
   const save = () => {
-    fetch(`${API_BASE}/${editId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editForm),
-    }).then(() => { setEditId(null); onChange(); });
+    fetch(`${API_BASE}/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editForm) })
+      .then(() => { setEditId(null); onChange(); });
   };
 
   const icon = key => sortKey === key ? (sortAsc ? ' ▲' : ' ▼') : ' ⇅';
 
   if (loading) return <p>Loading...</p>;
+
+  const COLS = [['partName','Part Name'],['supplierName','Supplier'],['machineModel','Machine Model'],['stage','Stage'],['stockQuantity','Stock'],['reorderThreshold','Reorder At']];
 
   return (
     <section className="card">
@@ -114,21 +107,21 @@ export default function PartsTable({ tick, onChange }) {
       <table className="parts-table">
         <thead>
           <tr>
-            {[['partName','Part Name'],['supplierName','Supplier'],['machineModel','Machine Model'],['stage','Stage'],['stockQuantity','Stock']].map(([k,l]) => (
-              <th key={k} onClick={() => sort(k)}>{l}<span className="sort-icon">{icon(k)}</span></th>
-            ))}
+            {COLS.map(([k, l]) => <th key={k} onClick={() => sort(k)}>{l}<span className="sort-icon">{icon(k)}</span></th>)}
             <th>Advance</th><th>Edit</th><th>History</th><th>Delete</th>
           </tr>
         </thead>
         <tbody>
           {visible.map(p => {
-            const row = p.stockQuantity < 10 ? 'row-low' : 'row-ok';
+            const needsReorder = p.stockQuantity <= p.reorderThreshold;
+            const row = needsReorder ? 'row-low' : 'row-ok';
             const open = historyId === p.id;
 
             if (editId === p.id && editForm) {
               const upd = e => {
                 const { name, value } = e.target;
-                setEditForm(f => ({ ...f, [name]: name === 'stockQuantity' ? Number(value) : value }));
+                const nums = ['stockQuantity', 'unitCost', 'reorderThreshold'];
+                setEditForm(f => ({ ...f, [name]: nums.includes(name) ? Number(value) : value }));
               };
               return (
                 <tr key={p.id} className={row}>
@@ -137,6 +130,7 @@ export default function PartsTable({ tick, onChange }) {
                   <td><input name="machineModel" value={editForm.machineModel} onChange={upd}/></td>
                   <td><select name="stage" value={editForm.stage} onChange={upd}>{STAGES.map(s=><option key={s}>{s}</option>)}</select></td>
                   <td><input type="number" name="stockQuantity" min="0" value={editForm.stockQuantity} onChange={upd}/></td>
+                  <td><input type="number" name="reorderThreshold" min="0" value={editForm.reorderThreshold} onChange={upd}/></td>
                   <td>—</td>
                   <td><button className="btn-yellow" onClick={save}>Save</button></td>
                   <td>—</td>
@@ -148,16 +142,20 @@ export default function PartsTable({ tick, onChange }) {
             return (
               <>
                 <tr key={p.id} className={row}>
-                  <td>{p.partName}</td><td>{p.supplierName}</td><td>{p.machineModel}</td>
-                  <td>{p.stage}</td><td>{p.stockQuantity}</td>
+                  <td>{p.partName}</td>
+                  <td>{p.supplierName}</td>
+                  <td>{p.machineModel}</td>
+                  <td>{p.stage}</td>
+                  <td>{p.stockQuantity}{needsReorder && <span> ⚠️</span>}</td>
+                  <td>{p.reorderThreshold}</td>
                   <td><button className="btn-yellow" onClick={() => advance(p.id)} disabled={p.stage==='DEPLOYED'}>{p.stage==='DEPLOYED'?'Done':'Advance →'}</button></td>
                   <td><button className="btn-yellow" onClick={() => { setEditId(p.id); setEditForm({...p}); }}>Edit</button></td>
                   <td><button className="btn-ghost" onClick={() => setHistoryId(open ? null : p.id)}>{open ? 'Hide' : 'History'}</button></td>
                   <td><button className="btn-danger" onClick={() => del(p.id)}>Delete</button></td>
                 </tr>
                 {open && (
-                  <tr key={`hist-${p.id}`}>
-                    <td colSpan="9" style={{ padding: '8px 16px', background: '#f8f9fb' }}>
+                  <tr key={`h${p.id}`}>
+                    <td colSpan="10" style={{ padding: '8px 16px', background: '#f8f9fb' }}>
                       <strong style={{ fontSize: '0.85rem', color: '#555' }}>Change log — {p.partName}</strong>
                       <HistoryPanel partId={p.id} />
                     </td>
@@ -166,7 +164,7 @@ export default function PartsTable({ tick, onChange }) {
               </>
             );
           })}
-          {!visible.length && <tr><td colSpan="9" style={{textAlign:'center'}}>{!parts.length ? 'No parts yet.' : 'No matches.'}</td></tr>}
+          {!visible.length && <tr><td colSpan="10" style={{textAlign:'center'}}>{!parts.length ? 'No parts yet.' : 'No matches.'}</td></tr>}
         </tbody>
       </table>
     </section>
