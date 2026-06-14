@@ -1,12 +1,17 @@
-# Java / Maven
-backend/target/
-*.class
-*.jar
-.mvn/
-.idea/
-*.iml
+# dependencies
+node_modules/
 
-# Node / Vite
-frontend/node_modules/
-frontend/dist/
+# env files — never commit real secrets
+.env
+*.env.local
+
+# build output
+dist/
+build/
+
+# test coverage
+coverage/
+
+# editor and OS files
 .DS_Store
+*.log

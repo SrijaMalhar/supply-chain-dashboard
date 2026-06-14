@@ -1,0 +1,56 @@
+# VS Code REST Client — install 'REST Client' extension then click 'Send Request'
+
+### Get all parts
+GET http://localhost:5000/api/parts
+
+###
+
+### Get low stock parts
+GET http://localhost:5000/api/parts/low-stock
+
+###
+
+### Get stage summary
+GET http://localhost:5000/api/parts/summary
+
+###
+
+### Add a part
+POST http://localhost:5000/api/parts
+Content-Type: application/json
+
+{
+  "partName": "Test Filter",
+  "supplierName": "Bosch",
+  "machineModel": "Excavator X200",
+  "stage": "SUPPLIER",
+  "stockQuantity": 20,
+  "unitCost": 100,
+  "reorderThreshold": 10,
+  "notes": ""
+}
+
+###
+
+### Advance part to next stage (replace 1 with real id)
+PUT http://localhost:5000/api/parts/1/advance
+
+###
+
+### Update stock quantity
+PUT http://localhost:5000/api/parts/1
+Content-Type: application/json
+
+{
+  "stockQuantity": 50
+}
+
+###
+
+### Get part history
+GET http://localhost:5000/api/parts/1/history
+
+###
+
+### Delete a part
+DELETE http://localhost:5000/api/parts/1
