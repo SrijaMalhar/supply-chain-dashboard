@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE } from '../api.js';
 
 const STAGES = ['SUPPLIER', 'WAREHOUSE', 'ASSEMBLY', 'DEPLOYED'];
 const EVENT_ICON = { created: '🟢', stock_updated: '📦', stage_changed: '➡️' };
+
+function nextStage(s) {
+  const idx = STAGES.indexOf(s);
+  return idx < STAGES.length - 1 ? STAGES[idx + 1] : s;
+}
 
 function exportCSV(rows) {
   const header = 'Part Name,Supplier,Machine Model,Stage,Stock,Unit Cost,Reorder At,Notes';
@@ -44,12 +49,42 @@ export default function PartsTable({ tick, onChange }) {
   const [selected, setSelected]   = useState(new Set());
   const [bulkQtys, setBulkQtys]   = useState({});
   const [applying, setApplying]   = useState(false);
+  const partsRef = useRef(parts);
+  partsRef.current = parts;
 
   const load = () => {
     setLoading(true);
     fetch(API_BASE).then(r=>r.json()).then(d=>{setParts(d);setLoading(false);}).catch(()=>setLoading(false));
   };
   useEffect(load, [tick]);
+
+  // optimistic advance: update UI first, rollback if server fails
+  const advance = id => {
+    setParts(ps => ps.map(p => p.id === id ? { ...p, stage: nextStage(p.stage) } : p));
+    fetch(`${API_BASE}/${id}/advance`, { method: 'PUT' })
+      .then(r => { if (!r.ok) throw new Error(); onChange(); })
+      .catch(() => { setParts(partsRef.current); alert('Failed to advance stage.'); });
+  };
+
+  // optimistic delete: remove from UI first, rollback if server fails
+  const del = id => {
+    if (!confirm('Delete this part?')) return;
+    const snapshot = partsRef.current;
+    setParts(ps => ps.filter(p => p.id !== id));
+    fetch(`${API_BASE}/${id}`, { method: 'DELETE' })
+      .then(r => { if (!r.ok) throw new Error(); onChange(); })
+      .catch(() => { setParts(snapshot); alert('Failed to delete.'); });
+  };
+
+  // optimistic edit: apply changes locally first
+  const save = () => {
+    const snapshot = partsRef.current;
+    setParts(ps => ps.map(p => p.id === editId ? { ...p, ...editForm } : p));
+    setEditId(null);
+    fetch(`${API_BASE}/${editId}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(editForm) })
+      .then(r => { if (!r.ok) throw new Error(); onChange(); })
+      .catch(() => { setParts(snapshot); alert('Failed to save.'); });
+  };
 
   const models = useMemo(() => ['ALL', ...[...new Set(parts.map(p=>p.machineModel))].sort()], [parts]);
   const sortBy = key => key===sortKey ? setSortAsc(a=>!a) : (setSortKey(key), setSortAsc(true));
@@ -66,37 +101,22 @@ export default function PartsTable({ tick, onChange }) {
 
   const enterBulk = () => { setBulkMode(true); setSelected(new Set()); setBulkQtys({}); };
   const exitBulk  = () => { setBulkMode(false); setSelected(new Set()); setBulkQtys({}); };
-
   const toggleAll = () => {
     if (selected.size===visible.length) { setSelected(new Set()); }
-    else {
-      const ids = new Set(visible.map(p=>p.id));
-      setSelected(ids);
-      const init={};
-      for (const p of visible) if (!(p.id in bulkQtys)) init[p.id]=String(p.stockQuantity);
-      setBulkQtys(q=>({...q,...init}));
-    }
+    else { setSelected(new Set(visible.map(p=>p.id))); const init={}; for (const p of visible) if (!(p.id in bulkQtys)) init[p.id]=String(p.stockQuantity); setBulkQtys(q=>({...q,...init})); }
   };
-
   const handleCheck = (p, checked) => {
     setSelected(prev => { const s=new Set(prev); checked?s.add(p.id):s.delete(p.id); return s; });
     if (checked && !(p.id in bulkQtys)) setBulkQtys(q=>({...q,[p.id]:String(p.stockQuantity)}));
   };
-
   const applyBulk = async () => {
-    const toUpdate = [...selected].map(id => ({ part: parts.find(p=>p.id===id), newQty: Number(bulkQtys[id]??parts.find(p=>p.id===id)?.stockQuantity) }))
-      .filter(({part,newQty}) => newQty !== part.stockQuantity);
+    const toUpdate = [...selected].map(id => ({ part: parts.find(p=>p.id===id), newQty: Number(bulkQtys[id]) })).filter(({part,newQty})=>newQty!==part.stockQuantity);
     if (!toUpdate.length) { alert('No quantities changed.'); return; }
     setApplying(true);
-    await Promise.all(toUpdate.map(({part,newQty}) => fetch(`${API_BASE}/${part.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...part,stockQuantity:newQty}) })));
-    setApplying(false);
-    exitBulk();
-    onChange();
+    await Promise.all(toUpdate.map(({part,newQty})=>fetch(`${API_BASE}/${part.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...part,stockQuantity:newQty})})));
+    setApplying(false); exitBulk(); onChange();
   };
 
-  const del = id => { if(!confirm('Delete?')) return; fetch(`${API_BASE}/${id}`,{method:'DELETE'}).then(onChange); };
-  const advance = id => fetch(`${API_BASE}/${id}/advance`,{method:'PUT'}).then(onChange);
-  const save = () => fetch(`${API_BASE}/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(editForm)}).then(()=>{setEditId(null);onChange();});
   const icon = key => sortKey===key?(sortAsc?' ▲':' ▼'):' ⇅';
   const COLS=[['partName','Part Name'],['supplierName','Supplier'],['machineModel','Machine Model'],['stage','Stage'],['stockQuantity','Stock'],['reorderThreshold','Reorder At']];
 
@@ -114,14 +134,12 @@ export default function PartsTable({ tick, onChange }) {
           {bulkMode && <button className="btn-ghost" onClick={exitBulk}>✕ Cancel Bulk</button>}
         </div>
       </div>
-
       {bulkMode && (
         <div className="bulk-bar">
-          <span className="bulk-bar-info">{selected.size===0?'Check rows to update their stock quantity':selected.size+' part'+(selected.size>1?'s':'')+' selected'}</span>
-          <button className="btn-yellow" onClick={applyBulk} disabled={selected.size===0||applying}>{applying?'Applying…':'Apply Changes'+(selected.size>0?' ('+selected.size+')':'')}</button>
+          <span className="bulk-bar-info">{selected.size===0?'Check rows to update their stock':selected.size+' part'+(selected.size>1?'s':'')+' selected'}</span>
+          <button className="btn-yellow" onClick={applyBulk} disabled={selected.size===0||applying}>{applying?'Applying…':'Apply Changes'+(selected.size?' ('+selected.size+')':'')}</button>
         </div>
       )}
-
       <table className="parts-table">
         <thead>
           <tr>
@@ -138,7 +156,6 @@ export default function PartsTable({ tick, onChange }) {
             const sel = selected.has(p.id);
             const row = [nr?'row-low':'row-ok', bulkMode&&sel?'row-bulk-selected':''].join(' ').trim();
             const open = historyId===p.id;
-
             if (!bulkMode && editId===p.id && editForm) {
               const upd = e => { const {name,value}=e.target; const nums=['stockQuantity','unitCost','reorderThreshold']; setEditForm(f=>({...f,[name]:nums.includes(name)?Number(value):value})); };
               return (
@@ -154,7 +171,6 @@ export default function PartsTable({ tick, onChange }) {
                 </tr>
               );
             }
-
             return (
               <>
                 <tr key={p.id} className={row}>
@@ -170,7 +186,7 @@ export default function PartsTable({ tick, onChange }) {
                     <td><button className="btn-danger" onClick={()=>del(p.id)}>Delete</button></td>
                   </>}
                 </tr>
-                {!bulkMode && open && <tr key={`h${p.id}`}><td colSpan="11" style={{padding:'8px 16px',background:'#f8f9fb'}}><strong style={{fontSize:'0.85rem',color:'#555'}}>Change log — {p.partName}</strong><HistoryPanel partId={p.id}/></td></tr>}
+                {!bulkMode && open && <tr key={'h'+p.id}><td colSpan="11" style={{padding:'8px 16px',background:'#f8f9fb'}}><strong style={{fontSize:'0.85rem',color:'#555'}}>Change log — {p.partName}</strong><HistoryPanel partId={p.id}/></td></tr>}
               </>
             );
           })}
