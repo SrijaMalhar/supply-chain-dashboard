@@ -1,105 +1,121 @@
 package com.portfolio.supplychain.service;
 
+import com.portfolio.supplychain.model.HistoryEntry;
 import com.portfolio.supplychain.model.SparePart;
 import com.portfolio.supplychain.repository.SparePartRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 /**
  * Business logic layer.
  *
- * Sits between the controller and the repository so that
- * controllers stay thin and any future logic (validation,
- * notifications, etc.) has a clear home.
+ * Also maintains an in-memory audit log per part (resets on restart).
+ * Each create / stock update / stage advance appends a HistoryEntry.
  */
 @Service
 public class SparePartService {
 
-    // Low stock threshold used by getLowStockParts()
-    private static final int LOW_STOCK_THRESHOLD = 10;
-
     private final SparePartRepository repository;
 
-    // Constructor injection (preferred over field injection)
+    // In-memory audit log — keyed by part id
+    private static final Map<Long, List<HistoryEntry>> history = new ConcurrentHashMap<>();
+    private static final AtomicLong historyId = new AtomicLong(1);
+
+    private static final List<String> STAGE_ORDER =
+            List.of("SUPPLIER", "WAREHOUSE", "ASSEMBLY", "DEPLOYED");
+
     public SparePartService(SparePartRepository repository) {
         this.repository = repository;
     }
 
-    /** Return every spare part in the database. */
+    private void addHistory(Long partId, String event, String note) {
+        HistoryEntry entry = new HistoryEntry(
+            historyId.getAndIncrement(), event, note, Instant.now().toString()
+        );
+        history.computeIfAbsent(partId, k -> new ArrayList<>()).add(entry);
+    }
+
     public List<SparePart> getAllParts() {
         return repository.findAll();
     }
 
-    /** Persist a new spare part and return the saved entity (with id). */
     public SparePart addPart(SparePart part) {
-        return repository.save(part);
+        SparePart saved = repository.save(part);
+        addHistory(saved.getId(), "created", "Part created: " + saved.getPartName());
+        return saved;
     }
 
-    /** Delete a spare part by its id. */
     public void deletePart(Long id) {
+        history.remove(id);
         repository.deleteById(id);
     }
 
-    /**
-     * Update an existing spare part. Looks up by id, copies over the
-     * editable fields from the incoming object, and saves.
-     */
     public SparePart updatePart(Long id, SparePart updated) {
         SparePart existing = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Part not found: " + id));
+
         existing.setPartName(updated.getPartName());
         existing.setSupplierName(updated.getSupplierName());
         existing.setMachineModel(updated.getMachineModel());
         existing.setStage(updated.getStage());
+        existing.setUnitCost(updated.getUnitCost());
+        existing.setReorderThreshold(updated.getReorderThreshold());
+        existing.setNotes(updated.getNotes());
+
+        int oldQty = existing.getStockQuantity() != null ? existing.getStockQuantity() : 0;
         existing.setStockQuantity(updated.getStockQuantity());
-        return repository.save(existing);
+
+        SparePart saved = repository.save(existing);
+
+        if (updated.getStockQuantity() != null && updated.getStockQuantity() != oldQty) {
+            addHistory(id, "stock_updated",
+                "Stock changed: " + oldQty + " → " + updated.getStockQuantity());
+        }
+        return saved;
     }
 
-    /** Return parts whose stock is strictly below the low-stock threshold. */
+    /** Returns parts whose stock is at or below their individual reorder threshold. */
     public List<SparePart> getLowStockParts() {
-        return repository.findByStockQuantityLessThan(LOW_STOCK_THRESHOLD);
+        return repository.findAll().stream()
+                .filter(p -> {
+                    int threshold = p.getReorderThreshold() != null ? p.getReorderThreshold() : 10;
+                    return p.getStockQuantity() <= threshold;
+                })
+                .collect(Collectors.toList());
     }
 
-    // Ordered pipeline used by advanceStage() and stage summaries.
-    private static final List<String> STAGE_ORDER =
-            List.of("SUPPLIER", "WAREHOUSE", "ASSEMBLY", "DEPLOYED");
-
-    /**
-     * Return a count of parts at each stage, in pipeline order.
-     * Stages with zero parts are still included so the dashboard
-     * always shows the full pipeline.
-     */
     public Map<String, Long> getStageSummary() {
         List<SparePart> all = repository.findAll();
-        // LinkedHashMap preserves SUPPLIER -> WAREHOUSE -> ASSEMBLY -> DEPLOYED order.
         Map<String, Long> counts = new LinkedHashMap<>();
-        for (String stage : STAGE_ORDER) {
-            counts.put(stage, 0L);
-        }
-        for (SparePart p : all) {
-            counts.merge(p.getStage(), 1L, Long::sum);
-        }
+        for (String stage : STAGE_ORDER) counts.put(stage, 0L);
+        for (SparePart p : all) counts.merge(p.getStage(), 1L, Long::sum);
         return counts;
     }
 
-    /**
-     * Advance a part to the next stage in the pipeline:
-     *   SUPPLIER -> WAREHOUSE -> ASSEMBLY -> DEPLOYED
-     * If the part is already DEPLOYED (the final stage), it is returned unchanged.
-     */
     public SparePart advanceStage(Long id) {
         SparePart part = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Part not found: " + id));
-
-        int currentIndex = STAGE_ORDER.indexOf(part.getStage());
-        // If the stage is unknown OR already at the last stage, do nothing.
-        if (currentIndex >= 0 && currentIndex < STAGE_ORDER.size() - 1) {
-            part.setStage(STAGE_ORDER.get(currentIndex + 1));
-            return repository.save(part);
+        int idx = STAGE_ORDER.indexOf(part.getStage());
+        if (idx >= 0 && idx < STAGE_ORDER.size() - 1) {
+            String oldStage = part.getStage();
+            part.setStage(STAGE_ORDER.get(idx + 1));
+            SparePart saved = repository.save(part);
+            addHistory(id, "stage_changed", oldStage + " → " + saved.getStage());
+            return saved;
         }
         return part;
+    }
+
+    public List<HistoryEntry> getHistory(Long id) {
+        return history.getOrDefault(id, Collections.emptyList());
     }
 }

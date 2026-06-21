@@ -10,16 +10,13 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
 /**
- * SparePart entity.
+ * SparePart entity — one row per part in the H2 database.
  *
- * Represents a single spare part flowing through the supply chain.
- * The "stage" field tracks where the part currently is:
- *   SUPPLIER  -> WAREHOUSE -> ASSEMBLY -> DEPLOYED
+ * Pipeline stages: SUPPLIER -> WAREHOUSE -> ASSEMBLY -> DEPLOYED
  */
 @Entity
 public class SparePart {
 
-    // Auto-generated primary key
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -33,7 +30,6 @@ public class SparePart {
     @NotBlank(message = "machineModel is required")
     private String machineModel;
 
-    // Must be one of the four pipeline stages.
     @NotBlank(message = "stage is required")
     @Pattern(
         regexp = "SUPPLIER|WAREHOUSE|ASSEMBLY|DEPLOYED",
@@ -45,20 +41,16 @@ public class SparePart {
     @Min(value = 0, message = "stockQuantity must be 0 or greater")
     private Integer stockQuantity;
 
+    private Double unitCost;
+
+    // Per-part threshold — low-stock alert fires when stockQuantity <= this value.
+    private Integer reorderThreshold = 10;
+
+    private String notes;
+
     // ---- Constructors ----
 
-    public SparePart() {
-        // Default constructor required by JPA
-    }
-
-    public SparePart(String partName, String supplierName, String machineModel,
-                     String stage, Integer stockQuantity) {
-        this.partName = partName;
-        this.supplierName = supplierName;
-        this.machineModel = machineModel;
-        this.stage = stage;
-        this.stockQuantity = stockQuantity;
-    }
+    public SparePart() {}
 
     // ---- Getters and Setters ----
 
@@ -79,4 +71,13 @@ public class SparePart {
 
     public Integer getStockQuantity() { return stockQuantity; }
     public void setStockQuantity(Integer stockQuantity) { this.stockQuantity = stockQuantity; }
+
+    public Double getUnitCost() { return unitCost; }
+    public void setUnitCost(Double unitCost) { this.unitCost = unitCost; }
+
+    public Integer getReorderThreshold() { return reorderThreshold != null ? reorderThreshold : 10; }
+    public void setReorderThreshold(Integer reorderThreshold) { this.reorderThreshold = reorderThreshold; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 }
