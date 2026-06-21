@@ -4,34 +4,35 @@ Thanks for your interest in this project!
 
 ## Local Setup
 
-```bash
-# backend
-cd backend
-npm install
-npm start        # runs on :5000
+### Backend (Java 17 + Maven required)
 
-# frontend (new terminal)
-cd frontend
-npm install
-npm run dev      # runs on :5173
-```
 
-Or just:
 
-```bash
-docker compose up
-```
+### Frontend
+
+
+
+Or start everything at once:
+
+
+
+## Useful Dev Endpoints
+
+Once the backend is running, two extra endpoints are available:
+
+**Swagger UI** — browse and try every API endpoint in the browser:
+
+
+**H2 Console** — inspect and query the live in-memory database:
+
 
 ## Running Tests
 
-```bash
-cd backend
-npm test
-```
+
 
 ## Guidelines
 
 - Keep functions short and names obvious
-- Add a test if you change service logic in `partsService.js`
+- Add a test if you change logic in 
 - One feature per pull request
-- Open a PR against `main`
+- Open a PR against 

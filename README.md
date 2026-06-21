@@ -1,9 +1,9 @@
 # Supply Chain Parts Traceability Dashboard
 
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
-![Tests](https://img.shields.io/badge/tests-6%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Node](https://img.shields.io/badge/node-20-339933?logo=node.js&logoColor=white)
+![Java](https://img.shields.io/badge/java-17-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/spring_boot-3-6DB33F?logo=springboot&logoColor=white)
 ![React](https://img.shields.io/badge/react-18-61DAFB?logo=react&logoColor=black)
 ![Docker](https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white)
 
@@ -12,51 +12,47 @@ Supports stock monitoring, supplier health, audit logs, and inventory valuation.
 
 ## Quick Start
 
-```bash
-docker compose up
-# frontend: http://localhost:3000
-# backend:  http://localhost:5000
-```
+
 
 Or run locally:
 
-```bash
-# backend
-cd backend && npm install && npm start
 
-# frontend (separate terminal)
-cd frontend && npm install && npm run dev
-```
 
 ## Run Tests
 
-```bash
-cd backend && npm test
-```
 
-Covers: `advanceStage`, `getLowStockParts`, `getStageSummary` — 6 tests, no mocks needed.
 
 ## Features
 
 - Pipeline overview — part counts per stage with progress bar
 - Inventory value — total value broken down by stage
 - Supplier performance — health status per supplier
-- Low-stock alerts — parts at or below their reorder threshold
+- Low-stock alerts — per-part reorder threshold
 - Audit log — full history of stock and stage changes per part
-- Optimistic UI — actions reflect instantly; rollback on server error
-- Bulk stock update — select multiple parts and update quantities at once
+- Optimistic UI — actions reflect instantly; rollback on error
+- Bulk stock update — select multiple parts, update at once
 - CSV export, column sorting, search, stage and machine filters
 - Status report — plain-text summary copyable to clipboard
 - Duplicate detection — live suggestions when adding a part name
 
 ## Stack
 
-| Layer    | Tech                        |
-|----------|-----------------------------|
-| Frontend | React 18 + Vite             |
-| Backend  | Node.js + Express           |
-| Infra    | Docker Compose              |
-| Tests    | Jest                        |
+| Layer    | Tech                          |
+|----------|-------------------------------|
+| Frontend | React 18 + Vite               |
+| Backend  | Spring Boot 3 (Java 17)       |
+| Database | H2 in-memory (seeded via SQL) |
+| API docs | Swagger UI (springdoc)        |
+| Infra    | Docker Compose                |
+| Tests    | JUnit (via Maven)             |
+
+## Bonus Endpoints
+
+Once the backend is running:
+
+- **Swagger UI** — browse and test all endpoints interactively: 
+- **H2 Console** — inspect the live database in the browser: 
+  - JDBC URL:  — username , no password
 
 ## License
 
