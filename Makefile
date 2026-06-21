@@ -1,17 +1,16 @@
 # common dev commands
 
-install:
-	cd backend && npm install
-	cd frontend && npm install
+run-backend:
+	cd backend && mvn spring-boot:run
 
-test:
-	cd backend && npm test
+run-frontend:
+	cd frontend && npm install && npm run dev
 
-start-backend:
-	cd backend && npm start
+test-backend:
+	cd backend && mvn test
 
-start-frontend:
-	cd frontend && npm run dev
+package-backend:
+	cd backend && mvn package -DskipTests
 
 docker-up:
 	docker compose up
@@ -19,4 +18,4 @@ docker-up:
 docker-down:
 	docker compose down
 
-.PHONY: install test start-backend start-frontend docker-up docker-down
+.PHONY: run-backend run-frontend test-backend package-backend docker-up docker-down

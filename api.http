@@ -1,22 +1,22 @@
-# VS Code REST Client — install 'REST Client' extension then click 'Send Request'
+# VS Code REST Client — install the 'REST Client' extension, then click 'Send Request'
 
 ### Get all parts
-GET http://localhost:5000/api/parts
+GET http://localhost:8080/api/parts
 
 ###
 
-### Get low stock parts
-GET http://localhost:5000/api/parts/low-stock
+### Get low stock parts (at or below per-part reorder threshold)
+GET http://localhost:8080/api/parts/low-stock
 
 ###
 
 ### Get stage summary
-GET http://localhost:5000/api/parts/summary
+GET http://localhost:8080/api/parts/summary
 
 ###
 
 ### Add a part
-POST http://localhost:5000/api/parts
+POST http://localhost:8080/api/parts
 Content-Type: application/json
 
 {
@@ -25,7 +25,7 @@ Content-Type: application/json
   "machineModel": "Excavator X200",
   "stage": "SUPPLIER",
   "stockQuantity": 20,
-  "unitCost": 100,
+  "unitCost": 45.00,
   "reorderThreshold": 10,
   "notes": ""
 }
@@ -33,24 +33,39 @@ Content-Type: application/json
 ###
 
 ### Advance part to next stage (replace 1 with real id)
-PUT http://localhost:5000/api/parts/1/advance
+PUT http://localhost:8080/api/parts/1/advance
 
 ###
 
-### Update stock quantity
-PUT http://localhost:5000/api/parts/1
+### Update a part
+PUT http://localhost:8080/api/parts/1
 Content-Type: application/json
 
 {
-  "stockQuantity": 50
+  "partName": "Test Filter",
+  "supplierName": "Bosch",
+  "machineModel": "Excavator X200",
+  "stage": "SUPPLIER",
+  "stockQuantity": 50,
+  "unitCost": 45.00,
+  "reorderThreshold": 10,
+  "notes": ""
 }
 
 ###
 
 ### Get part history
-GET http://localhost:5000/api/parts/1/history
+GET http://localhost:8080/api/parts/1/history
 
 ###
 
 ### Delete a part
-DELETE http://localhost:5000/api/parts/1
+DELETE http://localhost:8080/api/parts/1
+
+###
+
+### Swagger UI (open in browser)
+# http://localhost:8080/swagger-ui.html
+
+### H2 database console (open in browser)
+# http://localhost:8080/h2-console
