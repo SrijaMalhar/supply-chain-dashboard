@@ -10,17 +10,35 @@
 Track spare parts as they move from supplier → warehouse → assembly → deployed.
 Supports stock monitoring, supplier health, audit logs, and inventory valuation.
 
+**Live demo:** https://srijamalhar.github.io/supply-chain-dashboard/
+
 ## Quick Start
 
+```bash
+# Easiest — needs Docker + Docker Compose
+docker compose up
+# Frontend → http://localhost:3000   Backend → http://localhost:8080
+```
 
+Or run each piece manually:
 
-Or run locally:
+```bash
+# Terminal 1 — backend
+cd backend
+mvn spring-boot:run
 
-
+# Terminal 2 — frontend
+cd frontend
+npm install
+npm run dev
+# Opens at http://localhost:5173
+```
 
 ## Run Tests
 
-
+```bash
+cd backend && mvn test
+```
 
 ## Features
 
@@ -50,9 +68,9 @@ Or run locally:
 
 Once the backend is running:
 
-- **Swagger UI** — browse and test all endpoints interactively: 
-- **H2 Console** — inspect the live database in the browser: 
-  - JDBC URL:  — username , no password
+- **Swagger UI** — browse and test all endpoints: http://localhost:8080/swagger-ui.html
+- **H2 Console** — inspect the live DB: http://localhost:8080/h2-console
+  - JDBC URL: `jdbc:h2:mem:partsdb` — username `sa`, no password
 
 ## License
 
